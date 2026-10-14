@@ -26,10 +26,7 @@ jobs:
       - name: Prepare static demo
         run: |
           mkdir -p public
-          cp src/ticker_bot/static/index.html public/index.html
-          cp src/ticker_bot/static/app.js public/app.js
-          cp src/ticker_bot/static/styles.css public/styles.css
-          cp src/ticker_bot/static/favicon.svg public/favicon.svg
+          cp bee-scanner.html public/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
