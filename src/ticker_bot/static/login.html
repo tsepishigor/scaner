@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Вхід · Сканер угод</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0b0f0e;
+        color: #e8eceb;
+      }
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        margin: 0;
+        padding: 24px;
+        background:
+          radial-gradient(circle at 50% 22%, rgba(231, 185, 78, 0.1), transparent 34%),
+          #0c0b08;
+      }
+      main { width: min(100%, 390px); }
+      .logo {
+        width: 46px;
+        height: 46px;
+        display: grid;
+        place-items: center;
+        margin: 0 auto 20px;
+        border: 1px solid rgba(231, 185, 78, 0.45);
+        border-radius: 13px;
+        color: #e7b94e;
+        font-size: 24px;
+        background: rgba(231, 185, 78, 0.1);
+      }
+      .card {
+        padding: 30px;
+        border: 1px solid #342e1f;
+        border-radius: 16px;
+        background: #15130e;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+      }
+      h1 { margin: 0; font-size: 22px; text-align: center; }
+      p {
+        margin: 9px 0 24px;
+        color: #a29b88;
+        font-size: 13px;
+        line-height: 1.5;
+        text-align: center;
+      }
+      label { display: block; color: #b1aa97; font-size: 12px; }
+      input {
+        width: 100%;
+        height: 46px;
+        margin-top: 8px;
+        padding: 0 13px;
+        border: 1px solid #3b3422;
+        border-radius: 10px;
+        outline: none;
+        color: #e8eceb;
+        background: #0f0d09;
+      }
+      input:focus {
+        border-color: rgba(231, 185, 78, 0.7);
+        box-shadow: 0 0 0 3px rgba(231, 185, 78, 0.12);
+      }
+      button {
+        width: 100%;
+        height: 44px;
+        margin-top: 14px;
+        border: 0;
+        border-radius: 10px;
+        color: #181307;
+        font-weight: 700;
+        cursor: pointer;
+        background: #e7b94e;
+      }
+      button:disabled { cursor: wait; opacity: 0.65; }
+      .error {
+        min-height: 18px;
+        margin-top: 12px;
+        color: #df6a5e;
+        font-size: 11px;
+        text-align: center;
+      }
+      .hint { margin: 17px 0 0; color: #6f6859; font-size: 10px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="logo" aria-hidden="true">⌁</div>
+      <section class="card">
+        <h1>Сканер угод</h1>
+        <p>Приватний робочий простір для відбору й аналізу акцій</p>
+        <form id="loginForm">
+          <label for="password">Пароль</label>
+          <input id="password" type="password" autocomplete="current-password" autofocus required />
+          <button type="submit">Увійти</button>
+          <div class="error" id="error" role="alert"></div>
+        </form>
+        <p class="hint">Доступ захищено. Не передавайте пароль стороннім.</p>
+      </section>
+    </main>
+    <script>
+      const form = document.querySelector("#loginForm");
+      const button = form.querySelector("button");
+      const error = document.querySelector("#error");
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        button.disabled = true;
+        error.textContent = "";
+        try {
+          const response = await fetch("/api/session/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password: document.querySelector("#password").value }),
+          });
+          if (!response.ok) throw new Error("Неправильний пароль");
+          window.location.replace("/");
+        } catch (failure) {
+          error.textContent = failure.message;
+          document.querySelector("#password").select();
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

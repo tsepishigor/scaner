@@ -1,0 +1,16 @@
+services:
+  ticker-bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      API_HOST: 0.0.0.0
+      DATABASE_PATH: /app/data/tickers.db
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ticker-data:/app/data
+
+volumes:
+  ticker-data:
+
