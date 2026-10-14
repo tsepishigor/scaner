@@ -4,168 +4,152 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>Сканер угод</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <meta name="theme-color" content="#0a0b09" />
+    <title>Bee Scanner</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <div>
-          <strong>Сканер угод</strong>
-          <span>робочий простір</span>
-        </div>
-      </div>
-      <div class="topbar-status">
-        <span class="status-chip demo-chip">Демо-дані</span>
-        <span class="status-chip" id="botStatus"><i></i>Перевірка бота</span>
-        <button class="icon-button labeled" id="criteriaButton" type="button">
-          <span aria-hidden="true">⚙</span> Критерії
-        </button>
-      </div>
-    </header>
-
-    <div class="workspace">
-      <aside class="watch-panel panel">
-        <div class="watch-controls">
-          <label class="field-label" for="scanDate">Торгова дата</label>
-          <input id="scanDate" class="control date-control" type="date" />
-
-          <div class="summary-grid">
-            <div><span>Усього</span><strong id="totalCount">0</strong></div>
-            <div><span>Підходять</span><strong id="matchedCount">0</strong></div>
-          </div>
-
-          <label class="search-box">
-            <span aria-hidden="true">⌕</span>
-            <input id="tickerSearch" type="search" placeholder="Пошук тікера" />
-          </label>
-
-          <label class="toggle-row">
-            <span>Лише за критеріями</span>
-            <input id="onlyMatches" type="checkbox" />
-            <i aria-hidden="true"></i>
-          </label>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">B</span>
+          <div><strong>BEE</strong><small>TRADING DESK</small></div>
         </div>
 
-        <div class="list-heading">
-          <span>Тікери з Telegram</span>
-          <span id="lastUpdated">—</span>
+        <nav class="main-nav" aria-label="Основна навігація">
+          <button class="nav-item active" type="button" data-view="scanner">
+            <span class="nav-icon">⌁</span><b>Огляд тікерів</b>
+          </button>
+          <button class="nav-item" type="button" data-view="backtest">
+            <span class="nav-icon">◫</span><b>Бектест</b><em id="backtestNavCount">0</em>
+          </button>
+          <button class="nav-item" id="criteriaNav" type="button">
+            <span class="nav-icon">⌘</span><b>Правила відбору</b>
+          </button>
+        </nav>
+
+        <div class="sidebar-note">
+          <span>НАСТУПНИЙ КРОК</span>
+          <b>Підключення Polygon</b>
+          <p>Ціни й графіки стануть реальними після додавання ключа.</p>
         </div>
-        <div class="ticker-list" id="tickerList" aria-live="polite"></div>
+
+        <div class="source-panel">
+          <p>СТАН СИСТЕМИ</p>
+          <div><i></i><b>Ринок</b><span id="marketSource">демо</span></div>
+          <div><i></i><b>Тікери</b><span id="tickerSource">приклади</span></div>
+          <small>Торгова дата: Нью-Йорк<br />Час сигналу: Київ</small>
+        </div>
       </aside>
 
-      <main class="chart-panel panel">
-        <div class="demo-notice" id="demoNotice">
-          <strong>Демонстраційні ринкові дані</strong>
-          <span>Тікери надходять із Telegram, ціни замінить Polygon.</span>
-        </div>
+      <main class="page">
+        <header class="page-header">
+          <div>
+            <p id="pageEyebrow">BEE WORKSPACE · v0.4</p>
+            <h1 id="pageTitle">Огляд тікерів</h1>
+            <span id="pageSubtitle">Швидкий відбір і розбір акцій за торговий день</span>
+          </div>
+          <div class="page-actions" id="scannerActions">
+            <label class="date-field">Торгова дата<input id="scanDate" type="date" /></label>
+            <button class="button secondary" id="addTickerButton" type="button">＋ Тікер</button>
+            <button class="button primary" id="analyzeButton" type="button">Аналізувати</button>
+          </div>
+          <div class="page-actions" id="backtestActions" hidden>
+            <button class="button primary" id="addBacktestButton" type="button">＋ Новий тест</button>
+          </div>
+        </header>
 
-        <div class="chart-toolbar">
-          <div class="instrument-title">
+        <section class="view active" id="scannerView">
+          <section class="day-overview">
+            <article class="ticker-board">
+              <div class="section-heading">
+                <div><span class="live-dot"></span><div><small>ПОТІК ДНЯ</small><strong id="feedTitle">Демо · 0 тікерів</strong></div></div>
+                <span id="lastUpdated">очікуємо оновлення</span>
+              </div>
+              <div class="ticker-chips" id="tickerChips"></div>
+            </article>
+
+            <aside class="day-pulse">
+              <div class="pulse-heading"><span>ПУЛЬС ДНЯ</span><b id="summaryDate">—</b></div>
+              <div class="pulse-grid">
+                <article><span>У списку</span><strong id="totalCount">0</strong></article>
+                <article><span>Пройшли</span><strong id="matchedCount">—</strong></article>
+                <article><span>Сер. оцінка</span><strong id="averageRating">—</strong></article>
+                <article><span>Правил</span><strong id="activeRuleCount">0</strong></article>
+              </div>
+              <p id="criteriaSummary">Критерії ще не задані</p>
+            </aside>
+          </section>
+
+          <section class="scanner-card">
+            <div class="list-heading">
+              <div><small>РОБОЧИЙ СПИСОК</small><h2>Акції за вибраний день</h2></div>
+              <span class="result-count" id="visibleCount">0 / 0</span>
+            </div>
+            <div class="filters">
+              <label class="search-field"><span>⌕</span><input id="tickerSearch" type="search" placeholder="Знайти тікер" /></label>
+              <label>Оцінка<select id="ratingFilter"><option value="0">Будь-яка</option><option value="1">1+</option><option value="2">2+</option><option value="3">3+</option><option value="4">4+</option><option value="5">5</option></select></label>
+              <label>Відбір<select id="matchFilter"><option value="all">Усі</option><option value="matched">Пройшли</option><option value="failed">Не пройшли</option></select></label>
+              <label>Рух<select id="trendFilter"><option value="all">Будь-який</option><option value="up">Зростають</option><option value="down">Падають</option></select></label>
+              <button class="button ghost" id="criteriaButton" type="button">⌘ Налаштувати правила <span id="criteriaCount"></span></button>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Тікер</th><th>Оцінка</th><th>Сигнал</th><th>Ціна</th><th>Зміна</th><th>RVOL</th><th>Float</th><th>Відбір</th><th></th></tr></thead>
+                <tbody id="scannerRows"></tbody>
+              </table>
+              <div class="empty-state" id="emptyState" hidden>За цими фільтрами тікерів немає.</div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="backtestView" hidden>
+          <section class="backtest-intro">
             <div>
-              <h1 id="selectedTicker">—</h1>
-              <span id="selectionMeta">Оберіть тікер</span>
+              <span>ЛАБОРАТОРІЯ СТРАТЕГІЇ</span>
+              <h2>Перевіряй ідеї на минулих угодах</h2>
+              <p>Додавай вхід, стоп і вихід. Сканер сам порахує результат у R та збере статистику.</p>
             </div>
-            <div class="live-quote">
-              <strong id="selectedPrice">—</strong>
-              <span id="selectedChange">—</span>
+            <div class="honey-visual" aria-hidden="true"><i></i><i></i><i></i><b>R</b></div>
+          </section>
+
+          <section class="backtest-summary">
+            <article><span>Усього тестів</span><strong id="backtestTotal">0</strong><small>записів у журналі</small></article>
+            <article><span>Win rate</span><strong id="backtestWinRate">—</strong><small>прибуткових угод</small></article>
+            <article><span>Середній результат</span><strong id="backtestAverageR">— R</strong><small>на одну угоду</small></article>
+            <article><span>Сумарний результат</span><strong class="accent" id="backtestTotalR">— R</strong><small>за вибраний період</small></article>
+          </section>
+
+          <section class="scanner-card backtest-card">
+            <div class="list-heading">
+              <div><small>ЖУРНАЛ БЕКТЕСТУ</small><h2>Історія перевірок</h2></div>
+              <span class="result-count" id="backtestVisibleCount">0 / 0</span>
             </div>
-          </div>
-          <div class="intervals" role="group" aria-label="Часовий інтервал">
-            <button type="button" data-interval="1">1хв</button>
-            <button type="button" data-interval="2">2хв</button>
-            <button type="button" data-interval="5" class="active">5хв</button>
-            <button type="button" data-interval="15">15хв</button>
-            <button type="button" data-interval="60">1г</button>
-            <button type="button" data-interval="1D">1д</button>
-          </div>
-        </div>
-
-        <div class="chart-legend" id="chartLegend">
-          <span>Відкр. <b id="legendOpen">—</b></span>
-          <span>Макс. <b id="legendHigh">—</b></span>
-          <span>Мін. <b id="legendLow">—</b></span>
-          <span>Закр. <b id="legendClose">—</b></span>
-          <span>Обсяг <b id="legendVolume">—</b></span>
-          <span class="vwap-key"><i></i>VWAP</span>
-        </div>
-
-        <div class="chart-stage" id="chartStage">
-          <canvas id="priceChart" aria-label="Свічковий графік"></canvas>
-          <div class="chart-empty" id="chartEmpty">Оберіть тікер для перегляду графіка</div>
-        </div>
-
-        <div class="metric-strip">
-          <div><span>Попер. закриття</span><strong id="previousClose">—</strong></div>
-          <div><span>Обсяг</span><strong id="metricVolume">—</strong></div>
-          <div><span>RVOL</span><strong id="metricRvol">—</strong></div>
-          <div><span>Float</span><strong id="metricFloat">—</strong></div>
-          <div><span>Капіталізація</span><strong id="metricCap">—</strong></div>
-        </div>
+            <div class="filters backtest-filters">
+              <label>Від<input id="backtestFrom" type="date" /></label>
+              <label>До<input id="backtestTo" type="date" /></label>
+              <label class="search-field"><span>⌕</span><input id="backtestTicker" type="search" placeholder="Тікер" /></label>
+              <label>Результат<select id="backtestOutcome"><option value="all">Усі</option><option value="win">Плюсові</option><option value="loss">Мінусові</option></select></label>
+              <button class="button secondary" id="resetBacktestFilters" type="button">Скинути</button>
+            </div>
+            <div class="table-wrap">
+              <table class="backtest-table">
+                <thead><tr><th>Дата</th><th>Тікер</th><th>Напрям</th><th>Вхід</th><th>Стоп</th><th>Вихід</th><th>Результат</th><th>Нотатка</th><th></th></tr></thead>
+                <tbody id="backtestRows"></tbody>
+              </table>
+              <div class="empty-state" id="backtestEmpty" hidden>Записів поки немає. Натисни «Новий тест».</div>
+            </div>
+          </section>
+        </section>
       </main>
-
-      <aside class="review-panel panel">
-        <section>
-          <div class="section-heading">
-            <div>
-              <span>Особиста оцінка</span>
-              <small>для обраного дня</small>
-            </div>
-            <span class="save-state" id="reviewSaveState">—</span>
-          </div>
-          <div class="rating-row" id="ratingRow" role="group" aria-label="Оцінка від 1 до 5">
-            <button type="button" data-rating="1">1</button>
-            <button type="button" data-rating="2">2</button>
-            <button type="button" data-rating="3">3</button>
-            <button type="button" data-rating="4">4</button>
-            <button type="button" data-rating="5">5</button>
-          </div>
-          <div class="rating-labels"><span>Слабко</span><span>Ідеально</span></div>
-        </section>
-
-        <section>
-          <div class="section-heading">
-            <div>
-              <span>Нотатка</span>
-              <small>спостереження й ідеї входу</small>
-            </div>
-          </div>
-          <textarea
-            id="reviewNotes"
-            rows="7"
-            maxlength="4000"
-            placeholder="Що побачили на графіку? Що сподобалось або насторожило?"
-          ></textarea>
-          <button class="primary-button" id="saveReview" type="button">Зберегти нотатку</button>
-        </section>
-
-        <section class="signal-card">
-          <div class="section-heading">
-            <div>
-              <span>Сигнал Telegram</span>
-              <small id="signalSource">очікуємо дані</small>
-            </div>
-            <span class="match-badge neutral" id="matchBadge">Без критеріїв</span>
-          </div>
-          <dl>
-            <div><dt>Перша поява</dt><dd id="firstSeen">—</dd></div>
-            <div><dt>Остання поява</dt><dd id="lastSeen">—</dd></div>
-            <div><dt>Кількість згадок</dt><dd id="mentionCount">—</dd></div>
-          </dl>
-        </section>
-      </aside>
     </div>
 
-    <dialog id="criteriaDialog" class="criteria-dialog">
+    <dialog class="modal criteria-modal" id="criteriaDialog">
       <form method="dialog" id="criteriaForm">
-        <div class="dialog-header">
-          <div>
-            <h2>Критерії відбору</h2>
-            <p>Порожнє поле не бере участі у відборі.</p>
-          </div>
-          <button class="icon-button" value="cancel" aria-label="Закрити" type="submit">×</button>
-        </div>
+        <header><div><p>ВЛАСНА ЛОГІКА</p><h2>Правила відбору</h2></div><button value="cancel" aria-label="Закрити">×</button></header>
+        <p class="modal-hint">Порожнє поле не впливає на відбір. Після Polygon ці правила працюватимуть на реальних даних.</p>
         <div class="criteria-grid">
           <label>Мінімальна ціна, $<input name="min_price" type="number" min="0" step="0.01" /></label>
           <label>Максимальна ціна, $<input name="max_price" type="number" min="0" step="0.01" /></label>
@@ -174,17 +158,63 @@
           <label>Мінімальний RVOL<input name="min_relative_volume" type="number" min="0" step="0.1" /></label>
           <label>Максимальний Float, млн<input name="max_float_millions" type="number" min="0" step="0.1" /></label>
         </div>
-        <div class="dialog-note">
-          Зараз критерії працюють на демо-показниках. Після підключення Polygon логіка залишиться та сама.
-        </div>
-        <div class="dialog-actions">
-          <button class="secondary-button" id="clearCriteria" type="button">Очистити</button>
-          <button class="primary-button" id="saveCriteria" type="button">Застосувати</button>
-        </div>
+        <footer><button class="button secondary" id="clearCriteria" type="button">Очистити</button><button class="button primary" id="saveCriteria" type="button">Застосувати</button></footer>
       </form>
     </dialog>
 
+    <dialog class="modal add-modal" id="addTickerDialog">
+      <form method="dialog" id="addTickerForm">
+        <header><div><p>НОВИЙ СИГНАЛ</p><h2>Додати тікер</h2></div><button value="cancel" aria-label="Закрити">×</button></header>
+        <p class="modal-hint">Поки автоматичне джерело не підключене, тікери можна додавати вручну.</p>
+        <label class="single-field">Тікер<input id="manualTicker" maxlength="9" autocomplete="off" placeholder="Наприклад: AAPL" /></label>
+        <footer><button class="button secondary" value="cancel">Скасувати</button><button class="button primary" id="addTickerSubmit" type="button">Додати</button></footer>
+      </form>
+    </dialog>
+
+    <dialog class="modal add-modal" id="backtestDialog">
+      <form method="dialog" id="backtestForm">
+        <header><div><p>НОВИЙ БЕКТЕСТ</p><h2>Записати результат</h2></div><button value="cancel" aria-label="Закрити">×</button></header>
+        <div class="backtest-form-grid">
+          <label>Дата<input name="day" type="date" required /></label>
+          <label>Тікер<input name="ticker" maxlength="9" placeholder="AAPL" required /></label>
+          <label>Напрям<select name="side"><option value="long">Long</option><option value="short">Short</option></select></label>
+          <label>Вхід, $<input name="entry" type="number" min="0.0001" step="0.0001" required /></label>
+          <label>Стоп, $<input name="stop" type="number" min="0.0001" step="0.0001" required /></label>
+          <label>Вихід, $<input name="exit" type="number" min="0.0001" step="0.0001" required /></label>
+          <label class="wide">Коротка нотатка<textarea name="note" rows="3" maxlength="240" placeholder="Що тестував?"></textarea></label>
+        </div>
+        <p class="form-error" id="backtestFormError"></p>
+        <footer><button class="button secondary" value="cancel">Скасувати</button><button class="button primary" id="saveBacktest" type="button">Зберегти тест</button></footer>
+      </form>
+    </dialog>
+
+    <dialog class="modal details-modal" id="detailsDialog">
+      <div class="details-shell">
+        <header class="details-header">
+          <div><p>КАРТКА АКЦІЇ</p><h2 id="detailsTicker">—</h2><span id="detailsMeta">—</span></div>
+          <div class="details-quote"><strong id="detailsPrice">—</strong><span id="detailsChange">—</span></div>
+          <button id="closeDetails" aria-label="Закрити">×</button>
+        </header>
+        <div class="details-grid">
+          <section class="chart-card">
+            <div class="chart-toolbar">
+              <div class="intervals"><button type="button" data-interval="1">1хв</button><button type="button" data-interval="2">2хв</button><button type="button" data-interval="5" class="active">5хв</button><button type="button" data-interval="15">15хв</button><button type="button" data-interval="60">1г</button><button type="button" data-interval="1D">1д</button></div>
+              <span class="demo-label">ДЕМО ДО POLYGON</span>
+            </div>
+            <div class="chart-legend"><span>Відкр. <b id="legendOpen">—</b></span><span>Макс. <b id="legendHigh">—</b></span><span>Мін. <b id="legendLow">—</b></span><span>Закр. <b id="legendClose">—</b></span><span>Обсяг <b id="legendVolume">—</b></span><span class="vwap-key"><i></i>VWAP</span></div>
+            <div class="chart-stage"><canvas id="priceChart"></canvas><div id="chartEmpty">Немає даних графіка</div></div>
+            <div class="metrics"><div><span>Попер. закриття</span><strong id="previousClose">—</strong></div><div><span>Обсяг</span><strong id="metricVolume">—</strong></div><div><span>RVOL</span><strong id="metricRvol">—</strong></div><div><span>Float</span><strong id="metricFloat">—</strong></div><div><span>Капіталізація</span><strong id="metricCap">—</strong></div></div>
+          </section>
+          <aside class="review-card">
+            <section><div class="review-heading"><div><b>Моя оцінка</b><small>від 1 до 5</small></div><span id="reviewSaveState">—</span></div><div class="rating-row" id="ratingRow"><button type="button" data-rating="1">1</button><button type="button" data-rating="2">2</button><button type="button" data-rating="3">3</button><button type="button" data-rating="4">4</button><button type="button" data-rating="5">5</button></div></section>
+            <section><div class="review-heading"><div><b>Нотатка</b><small>аналіз і майбутня точка входу</small></div></div><textarea id="reviewNotes" rows="8" maxlength="4000" placeholder="Що побачив на графіку?"></textarea><button class="button primary full" id="saveReview" type="button">Зберегти</button></section>
+            <section><div class="review-heading"><div><b>Результат відбору</b><small id="signalSource">—</small></div><span class="match-badge" id="matchBadge">—</span></div><p class="criteria-reasons" id="criteriaReasons"></p><dl><div><dt>Перша поява</dt><dd id="firstSeen">—</dd></div><div><dt>Остання поява</dt><dd id="lastSeen">—</dd></div><div><dt>Згадок</dt><dd id="mentionCount">—</dd></div></dl></section>
+          </aside>
+        </div>
+      </div>
+    </dialog>
+
     <div class="toast" id="toast" role="status"></div>
-    <script src="/static/app.js" defer></script>
+    <script src="./app.js" defer></script>
   </body>
 </html>

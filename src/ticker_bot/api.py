@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import hmac
+import logging
 import re
+import time as time_module
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Annotated, Self
@@ -24,6 +27,8 @@ from ticker_bot.telegram_bot import TelegramBotService
 
 _STATIC_DIR = Path(__file__).parent / "static"
 _TICKER_RE = re.compile(r"^[A-Z]{1,6}(?:\.[A-Z]{1,2})?$")
+_TELEGRAM_TOKEN_RE = re.compile(r"^\d+:[A-Za-z0-9_-]{20,}$")
+logger = logging.getLogger(__name__)
 
 
 class TickerItem(BaseModel):
@@ -40,6 +45,11 @@ class TickerListResponse(BaseModel):
     unique_tickers: int
     total_mentions: int
     items: list[TickerItem]
+
+
+class ManualTickerInput(BaseModel):
+    ticker: str = Field(min_length=1, max_length=9)
+    day: date | None = None
 
 
 class CriteriaPayload(BaseModel):
@@ -117,6 +127,31 @@ class LoginInput(BaseModel):
     password: str = Field(min_length=1, max_length=256)
 
 
+class LocalTelegramSettingsInput(BaseModel):
+    telegram_bot_token: str | None = Field(default=None, max_length=256)
+    allowed_chat_ids: str = Field(default="", max_length=500)
+    disconnect: bool = False
+
+    @model_validator(mode="after")
+    def validate_values(self) -> Self:
+        token = (self.telegram_bot_token or "").strip()
+        if token and not _TELEGRAM_TOKEN_RE.fullmatch(token):
+            raise ValueError("Токен не схожий на токен від BotFather")
+        for item in self.allowed_chat_ids.split(","):
+            if item.strip():
+                try:
+                    int(item.strip())
+                except ValueError as exc:
+                    raise ValueError("ID чатів мають бути числами через кому") from exc
+        return self
+
+
+class LocalTelegramSettingsResponse(BaseModel):
+    configured: bool
+    allowed_chat_ids: str
+    restart_required: bool = False
+
+
 class ReviewResponse(BaseModel):
     date: date
     ticker: str
@@ -164,16 +199,44 @@ def create_app(settings: Settings) -> FastAPI:
         else None
     )
 
+    async def maintain_telegram_connection() -> None:
+        retry_seconds = 15
+        while telegram is not None:
+            if not telegram.running:
+                try:
+                    await telegram.start()
+                    retry_seconds = 15
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    # Telegram errors can contain request details. Log only the type so a bot
+                    # token can never leak into the local console or a support screenshot.
+                    logger.warning(
+                        "Telegram bot is offline; retrying in %d seconds (error_type=%s)",
+                        retry_seconds,
+                        type(exc).__name__,
+                    )
+                    retry_seconds = min(retry_seconds * 2, 120)
+            await asyncio.sleep(retry_seconds)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await database.initialize()
         app.state.database = database
         app.state.telegram = telegram
+        telegram_task: asyncio.Task[None] | None = None
         try:
             if telegram is not None:
-                await telegram.start()
+                telegram_task = asyncio.create_task(
+                    maintain_telegram_connection(),
+                    name="telegram-connection",
+                )
             yield
         finally:
+            if telegram_task is not None:
+                telegram_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await telegram_task
             if telegram is not None:
                 await telegram.stop()
 
@@ -214,9 +277,20 @@ def create_app(settings: Settings) -> FastAPI:
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
-    async def require_api_token(authorization: str | None = Header(default=None)) -> None:
+    async def require_api_token(
+        request: Request,
+        authorization: str | None = Header(default=None),
+    ) -> None:
         expected = settings.scanner_api_token
         if expected is None:
+            return
+        expected_cookie = expected_session_cookie()
+        supplied_cookie = request.cookies.get("scanner_session", "")
+        if (
+            expected_cookie is not None
+            and supplied_cookie
+            and hmac.compare_digest(supplied_cookie, expected_cookie)
+        ):
             return
         prefix = "Bearer "
         supplied = (
@@ -265,6 +339,18 @@ def create_app(settings: Settings) -> FastAPI:
     async def scanner_page() -> FileResponse:
         return FileResponse(_STATIC_DIR / "index.html")
 
+    @app.get("/styles.css", include_in_schema=False)
+    async def scanner_styles() -> FileResponse:
+        return FileResponse(_STATIC_DIR / "styles.css", media_type="text/css")
+
+    @app.get("/app.js", include_in_schema=False)
+    async def scanner_script() -> FileResponse:
+        return FileResponse(_STATIC_DIR / "app.js", media_type="text/javascript")
+
+    @app.get("/favicon.svg", include_in_schema=False)
+    async def scanner_favicon() -> FileResponse:
+        return FileResponse(_STATIC_DIR / "favicon.svg", media_type="image/svg+xml")
+
     @app.get("/healthz")
     async def health() -> dict[str, object]:
         return {
@@ -282,6 +368,62 @@ def create_app(settings: Settings) -> FastAPI:
         if telegram is not None and not telegram.running:
             raise HTTPException(status_code=503, detail="Telegram bot is not ready")
         return {"status": "ready"}
+
+    def local_settings_path() -> Path:
+        path = settings.local_settings_path
+        if path is None:
+            raise HTTPException(status_code=404, detail="Локальні налаштування недоступні")
+        return path
+
+    @app.get(
+        "/api/v1/local-settings/telegram",
+        response_model=LocalTelegramSettingsResponse,
+        dependencies=[Depends(require_api_token)],
+    )
+    async def get_local_telegram_settings() -> LocalTelegramSettingsResponse:
+        local_settings_path()
+        return LocalTelegramSettingsResponse(
+            configured=settings.telegram_bot_token is not None,
+            allowed_chat_ids=",".join(str(value) for value in sorted(settings.allowed_chat_ids)),
+        )
+
+    @app.put(
+        "/api/v1/local-settings/telegram",
+        response_model=LocalTelegramSettingsResponse,
+        dependencies=[Depends(require_api_token)],
+    )
+    async def save_local_telegram_settings(
+        payload: LocalTelegramSettingsInput,
+    ) -> LocalTelegramSettingsResponse:
+        path = local_settings_path()
+        if payload.disconnect:
+            token = ""
+        elif payload.telegram_bot_token is None:
+            token = settings.telegram_bot_token or ""
+        else:
+            token = payload.telegram_bot_token.strip()
+        allowed_chat_ids = ",".join(
+            item.strip() for item in payload.allowed_chat_ids.split(",") if item.strip()
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(
+            "# Локальні налаштування Stock Scanner. Не надсилайте цей файл іншим.\n"
+            f"TELEGRAM_BOT_TOKEN={token}\n"
+            f"BOT_ENABLED={'true' if token else 'false'}\n"
+            f"ALLOWED_CHAT_IDS={allowed_chat_ids}\n",
+            encoding="utf-8",
+        )
+        temporary.replace(path)
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
+        return LocalTelegramSettingsResponse(
+            configured=bool(token),
+            allowed_chat_ids=allowed_chat_ids,
+            restart_required=True,
+        )
 
     @app.get(
         "/api/v1/tickers",
@@ -317,6 +459,35 @@ def create_app(settings: Settings) -> FastAPI:
                 )
                 for row in rows
             ],
+        )
+
+    @app.post(
+        "/api/v1/tickers/manual",
+        response_model=TickerItem,
+        dependencies=[Depends(require_api_token)],
+    )
+    async def add_manual_ticker(payload: ManualTickerInput) -> TickerItem:
+        ticker = _normalize_ticker(payload.ticker)
+        requested_day = selected_day(payload.day)
+        observed_at = datetime.combine(
+            requested_day,
+            time(12, 0),
+            tzinfo=settings.app_timezone,
+        ).astimezone(UTC)
+        await database.replace_message_mentions(
+            chat_id=0,
+            chat_title="Manual",
+            message_id=time_module.time_ns(),
+            tickers=[ticker],
+            observed_at_utc=observed_at,
+            local_date=requested_day,
+            source="manual",
+        )
+        return TickerItem(
+            ticker=ticker,
+            mentions=1,
+            first_seen_utc=observed_at,
+            last_seen_utc=observed_at,
         )
 
     @app.get(

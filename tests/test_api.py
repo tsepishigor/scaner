@@ -102,7 +102,7 @@ def test_scanner_page_and_preview_data(tmp_path) -> None:
         )
 
     assert page.status_code == 200
-    assert "Сканер угод" in page.text
+    assert "Огляд тікерів" in page.text
     assert scanner.status_code == 200
     assert scanner.json()["preview"] is True
     assert scanner.json()["data_mode"] == "demo"
@@ -142,6 +142,21 @@ def test_scanner_criteria_and_review_round_trip(tmp_path) -> None:
     assert aapl["notes"] == "Гарна точка входу"
 
 
+def test_manual_ticker_can_be_added_for_selected_day(tmp_path) -> None:
+    settings = make_settings(tmp_path)
+
+    with TestClient(create_app(settings)) as client:
+        added = client.post(
+            "/api/v1/tickers/manual",
+            json={"ticker": "nvda", "day": "2026-10-12"},
+        )
+        scanner = client.get("/api/v1/scanner", params={"day": "2026-10-12"})
+
+    assert added.status_code == 200
+    assert added.json()["ticker"] == "NVDA"
+    assert [item["ticker"] for item in scanner.json()["items"]] == ["NVDA"]
+
+
 def test_scanner_validates_criteria_and_ticker(tmp_path) -> None:
     settings = make_settings(tmp_path)
 
@@ -172,3 +187,22 @@ def test_site_password_protects_scanner_and_api(tmp_path) -> None:
         )
         assert login.status_code == 200
         assert client.get("/").status_code == 200
+
+
+def test_site_login_authorizes_browser_when_api_token_is_also_set(tmp_path) -> None:
+    settings = make_settings(
+        tmp_path,
+        api_token="api-secret",
+        site_password="site-password",
+    )
+
+    with TestClient(create_app(settings)) as client:
+        assert client.get("/api/v1/scanner").status_code == 401
+        assert (
+            client.post(
+                "/api/session/login",
+                json={"password": "site-password"},
+            ).status_code
+            == 200
+        )
+        assert client.get("/api/v1/scanner").status_code == 200

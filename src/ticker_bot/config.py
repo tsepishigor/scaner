@@ -48,6 +48,7 @@ class Settings:
     scanner_api_token: str | None
     scanner_site_password: str | None
     log_level: str
+    local_settings_path: Path | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -58,7 +59,7 @@ class Settings:
                 "Не задано TELEGRAM_BOT_TOKEN. Додайте токен або встановіть BOT_ENABLED=false."
             )
 
-        timezone_name = os.getenv("APP_TIMEZONE", "Europe/Kyiv").strip()
+        timezone_name = os.getenv("APP_TIMEZONE", "America/New_York").strip()
         try:
             timezone = ZoneInfo(timezone_name)
         except ZoneInfoNotFoundError as exc:
@@ -90,6 +91,11 @@ class Settings:
             scanner_api_token=os.getenv("SCANNER_API_TOKEN", "").strip() or None,
             scanner_site_password=os.getenv("SCANNER_SITE_PASSWORD", "").strip() or None,
             log_level=log_level,
+            local_settings_path=(
+                Path(value).expanduser()
+                if (value := os.getenv("LOCAL_SETTINGS_PATH", "").strip())
+                else None
+            ),
         )
 
     def chat_is_allowed(self, chat_id: int) -> bool:
